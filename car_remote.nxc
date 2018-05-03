@@ -1,0 +1,56 @@
+#define SLAVE_CONN 1
+#define SPEEDBOX 4
+#define TURNBOX 5
+
+bool BTConnectToNXT(string NXTSLAVE, int BTCONN) {
+ if (BluetoothStatus(BTCONN)==NO_ERR) {  // if connected
+  return TRUE;
+ }
+ else {
+   CommBTConnectionType args;
+   args.Name = NXTSLAVE;                 // name of the slave
+   args.ConnectionSlot = BTCONN;         // channel to the slave
+   args.Action = TRUE;
+   SysCommBTConnection(args);               // then connect
+   for (int i = 0; i < 10; i++) {
+    if (BluetoothStatus(BTCONN)==NO_ERR) {  // if connected
+     i = 10;
+     TextOut(0, LCD_LINE2, "Success !" ); 
+     return TRUE;
+     }
+    else {
+     TextOut(0, LCD_LINE2, "trying..." ); 
+     NumOut(60, LCD_LINE2, i );
+     Wait(999);
+     }
+   }
+  }
+  return FALSE;
+}
+
+task RotationSensorCheck()
+{
+  ResetRotationCount(OUT_AB);
+  while (true) {
+    int speed = MotorRotationCount(OUT_A);
+    if ( (speed<10) && (speed>-10) ) { speed=0; }
+    TextOut(0,LCD_LINE4,"Speed:     ");
+    NumOut(40,LCD_LINE4,speed);
+    while (!RemoteConnectionIdle(SLAVE_CONN)) {}
+    SendRemoteNumber(SLAVE_CONN, SPEEDBOX, speed);
+    Wait(9);
+    int turn  = MotorRotationCount(OUT_B);
+    if ( (turn<10) && (turn>-10) ) { turn=0; }
+    TextOut(0,LCD_LINE5,"Turn:      ");
+    NumOut(40,LCD_LINE5,turn);
+    while (!RemoteConnectionIdle(SLAVE_CONN)) {}
+    SendRemoteNumber(SLAVE_CONN, TURNBOX, turn);
+    Wait(9);
+  }
+}
+
+task main() {
+  if (BTConnectToNXT("Julie", SLAVE_CONN)) {
+   Precedes(RotationSensorCheck);
+  }
+} 

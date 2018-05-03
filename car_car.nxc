@@ -1,0 +1,64 @@
+#define SPEEDBOX 4
+#define TURNBOX 5
+
+safecall void drive(int speed) {
+  OnRevReg(OUT_BC,speed,OUT_REGMODE_SPEED);
+}
+
+safecall void stopdriving() {
+  Off(OUT_BC);
+}
+
+safecall void turnleft(int turn, int count) {
+  TextOut(0, LCD_LINE3, "Left       " );
+  NumOut(58, LCD_LINE3, turn );
+  if ( count > -40 ) { RotateMotor(OUT_A, 80,-12); }
+  }
+
+safecall void turnright(int turn, int count) {
+  TextOut(0, LCD_LINE3, "Right      " );
+  NumOut(58, LCD_LINE3, turn );
+  if ( count < 40 ) { RotateMotor(OUT_A, 80, 12); }
+}
+
+safecall void straight() {
+  TextOut(0, LCD_LINE3, "Straight   " );
+}
+
+task BeepBack() {
+  while(true) {
+    while (MotorPower(OUT_B) > 0) {
+      PlayTone(440,500);
+      Wait(750);
+    }
+  }
+}
+
+task ListenToMercedes() {
+  int speed;
+  int turn;
+  while(true) {
+   if (ReceiveRemoteNumber(TURNBOX,false,turn) != STAT_MSG_EMPTY_MAILBOX)
+    {
+      int count;
+      count = MotorRotationCount(OUT_A);
+      if ( turn > 0 )  {  turnright(turn,count); }
+      if ( turn < 0 )  {  turnleft(turn,count); }
+      if ( turn == 0 ) {  straight(); }
+    }
+   NumOut(58, LCD_LINE3, turn );
+   if (ReceiveRemoteNumber(SPEEDBOX,false,speed) != STAT_MSG_EMPTY_MAILBOX)
+    {
+      if ( speed > 0 )  { TextOut(0, LCD_LINE2, "Forward        " ); drive(speed); }
+      if ( speed < 0 )  { TextOut(0, LCD_LINE2, "Backward       " ); drive(speed); }
+      if ( speed == 0 ) { TextOut(0, LCD_LINE2, "Stopped        " ); stopdriving(); }
+    }
+   NumOut(58, LCD_LINE2, speed );
+   Wait(9);
+  }
+}
+
+task main() {
+  ResetRotationCount(OUT_A);
+  Precedes(ListenToMercedes,BeepBack);
+} 
