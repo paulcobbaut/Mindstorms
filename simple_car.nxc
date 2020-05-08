@@ -1,0 +1,113 @@
+//-----------------------------
+//Sarah rups-otau-ke 2020-05-07
+//-----------------------------
+
+#define TURN_TIME   600
+#define TURN_SPEED  90
+#define MOVE_SPEED  60
+
+// Distance in cm to avoid obstacles with UltraSonicSensor
+#define AVOIDDISTANCE 30
+
+safecall void turnleft() {
+ OnFwdReg(OUT_A,TURN_SPEED,OUT_REGMODE_SPEED);
+ OnRevReg(OUT_C,TURN_SPEED,OUT_REGMODE_SPEED);
+ Wait(TURN_TIME);
+ Off(OUT_AC);
+}
+
+safecall void turnright() {
+ OnRevReg(OUT_A,TURN_SPEED,OUT_REGMODE_SPEED);
+ OnFwdReg(OUT_C,TURN_SPEED,OUT_REGMODE_SPEED);
+ Wait(TURN_TIME);
+ Off(OUT_AC);
+}
+
+safecall void turnrandom() {
+ int lr = Random(2);
+ if (lr < 1) { 
+   OnRevReg(OUT_A,TURN_SPEED,OUT_REGMODE_SPEED);
+   OnFwdReg(OUT_C,TURN_SPEED,OUT_REGMODE_SPEED);
+   }
+ else {
+   OnFwdReg(OUT_A,TURN_SPEED,OUT_REGMODE_SPEED);
+   OnRevReg(OUT_C,TURN_SPEED,OUT_REGMODE_SPEED);
+   }
+ int RandomWaitTime = Random(800)+200;
+ Wait(RandomWaitTime);
+ Off(OUT_AC);
+}
+
+safecall void moveforward() {
+  OnFwdReg(OUT_AC,MOVE_SPEED,OUT_REGMODE_SPEED);
+}
+  
+safecall void movebackward() {
+  OnRevReg(OUT_AC,MOVE_SPEED,OUT_REGMODE_SPEED);
+}
+
+safecall void stopmoving() {
+  Off(OUT_AC);
+}
+
+inline int GetColorValue(const byte port) {
+  unsigned int raw[], norm[], scaled[];
+  int cval;
+  ReadSensorColorEx(port, cval, raw, norm, scaled);
+  return cval;
+}
+
+task RedBallStop() {
+  int ball;
+  while(true) {
+  ball = GetColorValue(IN_3);
+  if(ball == INPUT_REDCOLOR) {
+    StopAllTasks();
+    }
+  Wait(20);
+  }
+}
+
+task BeepBack() {
+  while(true) {
+    while (MotorPower(OUT_A) < 0) {
+      PlayTone(440,500);
+      Wait(750);
+    }
+  }
+}
+
+task DontBumpIntoThings() {
+   while(true){
+     //the ultrasonic sensor needs time to read the values
+     //that is why we have the 500 millisecond wait
+     Wait(500);
+     if(SensorUS(IN_1) < AVOIDDISTANCE){
+         movebackward();
+         Wait(2000);
+         turnrandom();
+         }
+     if(SensorUS(IN_1) > AVOIDDISTANCE){
+         moveforward();
+         }
+     }
+ }
+
+task main() {
+  //SetSensorTouch(IN_1);
+  //SetSensorLight(IN_4);
+  SetSensorUltrasonic(IN_1);
+  SetSensorColorFull(IN_3);
+  SetSensorSound(IN_4);
+
+  int soundvol = SENSOR_4;
+  while (soundvol < 30) {
+    NumOut(0,LCD_LINE1,soundvol);
+    Wait(10);
+    soundvol = SENSOR_4;
+  }
+  Precedes(DontBumpIntoThings,BeepBack,RedBallStop);
+
+  Off(OUT_ABC);
+  StopAllTasks();
+}
