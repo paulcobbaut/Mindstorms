@@ -8,3 +8,6 @@ Lego Mindstorms NXT and EV3 projects
 [simple_car.nxc](https://github.com/paulcobbaut/Mindstorms/blob/master/simple_car.nxc) contains code to operate two motors, the sound module and three sensors, namely sound, colour and Ultrasonic for distance measuring. The car starts when it hears a sound, it avoids obstacles with random turns and stops when it sees red (or a hand) in the colour sensor.
 A video is available here : https://youtu.be/_u21B5JuOyo
 
+### Tankrups vehicle with many sensors
+[tankrups](https://github.com/paulcobbaut/Mindstorms/tree/master/tankrups) contains code for a vehicle consisting of two NXT bricks with five motors and eight sensors. It can easily be expanded to more sensors. A video is available here https://youtu.be/bs-xb1P-MNY
+
