@@ -1,0 +1,143 @@
+//--------------------------------
+// Sarah Rups-tank BT-S 2020-05-10
+// File name: carsarah_bt.nxc
+//--------------------------------
+
+//------------------------------------------------------------
+// Thanks to John Hansen for the nbc/nxc guide
+// http://bricxcc.sourceforge.net/nbc/nxcdoc/nxcapi/index.html
+// Parts of this code come directly from this book
+//------------------------------------------------------------
+
+#include "init.h"
+
+safecall void turnleft() {
+ OnFwdReg(OUT_A,TURN_SPEED,OUT_REGMODE_SPEED);
+ OnRevReg(OUT_C,TURN_SPEED,OUT_REGMODE_SPEED);
+ Wait(TURN_TIME);
+ Off(OUT_AC);
+}
+
+safecall void turnright() {
+ OnRevReg(OUT_A,TURN_SPEED,OUT_REGMODE_SPEED);
+ OnFwdReg(OUT_C,TURN_SPEED,OUT_REGMODE_SPEED);
+ Wait(TURN_TIME);
+ Off(OUT_AC);
+}
+
+safecall void moveforward() {
+  OnFwdReg(OUT_AC,MOVE_SPEED,OUT_REGMODE_SPEED);
+}
+  
+safecall void movebackward() {
+  OnRevReg(OUT_AC,MOVE_SPEED,OUT_REGMODE_SPEED);
+}
+
+safecall void stopmoving() {
+  Off(OUT_AC);
+}
+
+
+// Beep when driving backwards (I iz big truck)
+
+task BeepBack() {
+  while(true) {
+    while (MotorPower(OUT_A) < 0) {
+      PlayTone(440,500);
+      Wait(750);
+    }
+  }
+}
+
+//-------------------------------------------
+// Listens to the other NXT for motorcommands
+//-------------------------------------------
+
+task ListenToJulie() {
+ byte message=NOTHING;
+ while(true) {
+   if (ReceiveRemoteNumber(MASTERBOX,true,message) != STAT_MSG_EMPTY_MAILBOX) {
+     switch(message) {
+       case FORWARD: moveforward(); break;
+       case BACKWARD: movebackward(); break;
+       case STOP: stopmoving(); break;
+       case TURNLEFT: turnleft(); break;
+       case TURNRIGHT: turnright(); break;
+       case STOPALL: StopAllTasks(); break;
+       }
+     }
+  }
+}
+
+
+//----------------------------------------------------
+// Checks the four touch sensors in the front (bumper)
+// The four buttons are multiplexed over one port
+//----------------------------------------------------
+
+task MuxButtons() { 
+  byte t1, t2, t3, t4;
+  SetSensorTouch(S1);
+  while (true) {
+    ReadSensorHTTouchMultiplexer(S1, t1, t2, t3, t4);
+    if (t1 || t2) {
+      TextOut(0, LCD_LINE1, "12pressed" );
+      SendRemoteNumber(MASTER_CONN, SLAVEBOX, S1S2BUMP);
+      }
+    else
+      TextOut(0, LCD_LINE1, "         " );
+    if (t3 || t4) {
+      TextOut(0, LCD_LINE3, "34pressed" );
+      SendRemoteNumber(MASTER_CONN, SLAVEBOX, S3S4BUMP);
+      }
+    else
+      TextOut(0, LCD_LINE3, "         " );
+    Wait(200); // avoid sending multiple messages for one bump
+  }
+}
+
+
+//-------------------------------------
+// Displays temperature in C and F
+// Copied from NXC Guide by John Hansen
+//-------------------------------------
+
+task DisplayTemp() 
+{
+  // 12 bit convert mode
+  byte bufSetTempMode[] = {0x98, 0x01, 0x60};
+  byte bufRead[] = {0x98, 0x00};
+  SetSensorLowspeed (S2);
+  I2CWrite(S2, 0, bufSetTempMode);
+  int status = I2CCheckStatus(S2);
+  while(status > NO_ERR)
+    status = I2CCheckStatus(S2);
+  Stop(status < NO_ERR);
+
+  while(true)
+  {
+    byte count = 2;
+    byte buf[];
+    float temp;
+    long rawtemp;
+    if (I2CBytes(S2, bufRead, count, buf))
+    {
+        rawtemp = (buf[0]*256 + buf[1])*10/16;
+        temp = (rawtemp/16)/10;
+        if (rawtemp > 20470)
+          temp -= 256;
+    }
+    else
+    {
+        temp = 99.9;
+    }
+    NumOut(0, LCD_LINE5, temp,false);
+    NumOut(0, LCD_LINE6, temp*1.8+32,false);
+    Wait(100);
+  }
+}
+
+task main() {
+  Precedes(ListenToJulie,MuxButtons,DisplayTemp,BeepBack);
+}
+

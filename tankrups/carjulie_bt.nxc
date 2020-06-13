@@ -1,0 +1,191 @@
+//-------------------------------
+//Julie Rups-tank BT-M 2020-05-10
+//-------------------------------
+
+#include "init.h"
+#include "bluetooth.nxc"
+
+inline int GetColorValue(const byte port) {
+ unsigned int r[], n[], s[];
+ int cv;
+ ReadSensorColorEx(port, cv, r, n, s);
+ return cv;
+ }
+
+safecall void sendtoSarah(byte message) {
+  while (!RemoteConnectionIdle(SLAVE_CONN)) {}
+  SendRemoteNumber(SLAVE_CONN, MASTERBOX, message);
+}
+
+safecall void turnleft() {
+  sendtoSarah(TURNLEFT);
+  OnFwdReg(OUT_A,TURN_SPEED,OUT_REGMODE_SPEED);
+  OnRevReg(OUT_C,TURN_SPEED,OUT_REGMODE_SPEED);
+  Wait(TURN_TIME);
+  Off(OUT_AC);
+}
+
+safecall void turnright() {
+  sendtoSarah(TURNRIGHT);
+  OnRevReg(OUT_A,TURN_SPEED,OUT_REGMODE_SPEED);
+  OnFwdReg(OUT_C,TURN_SPEED,OUT_REGMODE_SPEED);
+  Wait(TURN_TIME);
+  Off(OUT_AC);
+}
+
+safecall void moveforward() {
+  sendtoSarah(FORWARD);
+  OnRevReg(OUT_AC,MOVE_SPEED,OUT_REGMODE_SPEED);
+}
+  
+safecall void movebackward() {
+  sendtoSarah(BACKWARD);
+  OnFwdReg(OUT_AC,MOVE_SPEED,OUT_REGMODE_SPEED);
+}
+
+safecall void stopmoving() {
+  sendtoSarah(STOP);
+  Off(OUT_AC);
+}
+
+safecall void movecommandwheel() {
+  OnFwdReg(OUT_B,2,OUT_REGMODE_SPEED);
+}
+
+safecall void stopcommandwheel() {
+  Off(OUT_B);
+}
+
+safecall void backright() {
+  movebackward();
+  Wait(2000);
+  turnright();
+}
+
+safecall void backleft() {
+  movebackward();
+  Wait(2000);
+  turnleft();
+}
+
+task MoveTest() {
+  moveforward();
+  Wait(40000);
+  stopmoving();
+}
+
+task ListenToSarah() {
+  int number;
+  while(true) {
+    if (ReceiveRemoteNumber(SLAVEBOX,true,number) != STAT_MSG_EMPTY_MAILBOX) {
+     if (number==S1S2BUMP) { backright(); }
+     if (number==S3S4BUMP) { backleft(); }
+     number=NOTHING;
+     Wait(100);
+    }
+  }
+}
+
+task TaskEnder() {
+  while(true) {
+    if (ButtonPressed(BTNCENTER, TRUE)) {
+      sendtoSarah(STOPALL);
+      RemoteStopProgram(SLAVE_CONN); // probably already stopped
+      StopAllTasks(); 
+    }
+  }
+} 
+
+task LookAtColours() {
+  string sColor;
+  int nColor;
+  SetSensorColorFull(S4);
+  while (true) {
+    nColor = Sensor(S4);
+    switch(nColor) {
+      case 1: sColor = "Black"; stopmoving(); break;
+      case 2: sColor = "Blue";break;
+      case 3: sColor = "Green"; moveforward(); break;
+      case 4: sColor = "Yellow";break;
+      case 5: sColor = "Red"; movebackward(); break;
+      case 6: sColor = "White";break;
+      default: sColor = "???";break;
+    }
+    ClearScreen();
+    TextOut(0, 56, NumToStr(nColor) + ". " + sColor);
+    Wait(500);
+    while( Sensor(S4) == nColor ); 
+  }
+}
+
+safecall void greenball() {
+  TextOut(0,LCD_LINE7,"Green ");
+  moveforward();
+}
+
+safecall void redball() {
+  TextOut(0,LCD_LINE7,"Red   ");
+  stopmoving();
+}
+
+safecall void yellowball() {
+  TextOut(0,LCD_LINE7,"Yellow");
+  movebackward();
+}
+
+safecall void blueball() {
+  TextOut(0,LCD_LINE7,"Blue  ");
+  turnright();
+}
+
+task ReadCommandWheel() {
+  SetSensorColorFull(S3);
+  while (true) {
+    switch (GetColorValue(S3)) {
+      case 2: blueball(); break;
+      case 3: greenball();break;
+      case 4: yellowball();break;
+      case 5: redball();;break;
+      default: movecommandwheel(); TextOut(0,LCD_LINE7,"def    ");break;
+    }
+    Wait(500);
+  }
+}
+
+task LookAtLights() {
+   SetSensorLight(S4,false);
+   while (true) {
+     int val = SensorValue(S4);
+     if ( val > 10 ) {
+       TextOut(0,LCD_LINE1,"LIGHT  ");
+     }
+     else {
+       TextOut(0,LCD_LINE1,"DARK   ");
+       sendtoSarah(STOPALL);
+       StopAllTasks(); 
+     }
+     NumOut(40,LCD_LINE3,val);
+     Wait(500);
+   }
+}
+
+task main() {
+  SetSensorSound(IN_1);
+  int soundvol = SENSOR_1;
+  while (soundvol < 30) {
+    NumOut(0,LCD_LINE1,soundvol);
+    Wait(10);
+    soundvol = SENSOR_1;
+  }
+  if (BTConnectToNXT("Sarah", SLAVE_CONN)) {
+    Wait(300);
+    RemoteStartProgram(SLAVE_CONN, "carsarah_bt.rxe");
+    Wait(300);
+    bool result = RemoteConnectionIdle(SLAVE_CONN);
+    if (result) {
+      Precedes(ListenToSarah,LookAtLights,ReadCommandWheel);
+//    Precedes(MoveTest);
+    }
+  }
+}
+
